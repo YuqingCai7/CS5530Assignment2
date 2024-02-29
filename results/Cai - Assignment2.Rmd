@@ -1,0 +1,135 @@
+---
+title: "Cai - Assignment2"
+author: "Yuqing Cai"
+date: "2024-02-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(fastDummies)
+
+```
+
+## Introduction
+
+This document presents an overview of the completed version of assignment 2 by Yuqing Cai. This study will also provide clarifications and explanations regarding the functions implemented in the program.
+
+
+
+## Getting Started
+
+Before making any changes to a data file, we would first have to read the data file into our program. The procedure can be seen down below:
+
+
+```{r readdata, echo=TRUE}
+raw_car_data <- read.csv("C:/Users/yuqin/Desktop/CS5530Assignment2/data_raw/train.csv")
+knitr::kable(head(raw_car_data), caption = "First few rows of the raw data")
+```
+
+This gives us a brief overview of what our raw data looks like.
+
+
+## Remove NA values
+
+The first step is to locate all of the missing values in all the columns from our data file, then replace the NAs with either mean/median, or remove them. In this case, I chose to replace all NA values with median, due to the reason that medians are often not impacted by the presence of outliers, which makes the value of the median an optimal choice to replacement of the NAs. In order to achieve this goal, here is my solution:
+
+
+```{r checkmiss, echo=TRUE}
+missing_values <- colSums(is.na(raw_car_data))
+knitr::kable(data.frame(Column = names(missing_values), Missing_Values = missing_values),
+             caption = "Number of missing values in each column")
+```
+
+
+This allows us to check the numbers of NAs from each column. As we can see, there are 38 NAs in the column of "Seats". Next, we will replace the NAs with the median value:
+
+
+```{r replaceNA}
+no_missing_data <- raw_car_data %>% 
+  mutate_all(~replace_na(., median(., na.rm = TRUE))) %>% 
+  mutate(New_Price = ifelse(is.na(New_Price), "NA", New_Price))
+```
+
+With this code, the NAs from all columns have been replaced with the median value of the column. In addition, due to a lack of observations on the values of New Price for majority of the vehicles on our data, we will be replacing the missing values with "NA", as replacing the missing values with either mean or median wouldn't be a accurate represtation due to lack of information; thus, we will use "NA" in this case to represent the lack of observations.
+
+
+## Removing the Units
+
+The second step is to remove the units "kmpl", "cc", "bhp", and "Lakh" from the columns Mileage, Engine, Power and New_Price, here is how it's done:
+
+```{r removeUnits, echo=TRUE}
+no_missing_data$Mileage <- as.numeric(gsub("[^0-9.]", "", no_missing_data$Mileage))
+no_missing_data$Engine <- as.numeric(gsub("[^0-9.]", "", no_missing_data$Engine))
+no_missing_data$Power <- as.numeric(gsub("[^0-9.]", "", no_missing_data$Power))
+no_missing_data$New_Price <- as.numeric(gsub("[^0-9.]", "", no_missing_data$New_Price))
+
+no_unit_data <- no_missing_data %>% 
+  rename(`Engine(cc)` = `Engine`) %>% 
+  rename(`Mileage(kmpl)` = `Mileage`) %>% 
+  rename(`Power(bhp)` = `Power`) %>% 
+  rename(`New_Price(Lakh)` = `New_Price`) %>% 
+  rename(`Price(Lakh)` = `Price`)
+
+knitr::kable(head(no_unit_data), caption = "First few rows after processing unit data")
+
+```
+
+As we can see from the results above, the units have been removed from each cell, instead, the units have been added to the header of the column.
+
+
+## One Hot Data
+
+To convert the categorical variable "Fuel_Type" and "Transmission" into numerical one hot encoded value, it can be done following the code below:
+
+```{r onehot}
+one_hot_data <- dummy_cols(no_unit_data, select_columns = c("Fuel_Type", "Transmission"))
+knitr::kable(head(one_hot_data), caption = "First few rows after converting categorical variables to one-hot encoded values")
+```
+
+
+## Extra Feature
+
+To add an extra feature(column) to our data, I chose to calculate the age of each vehicle by subtracting the year when the car was built, from the current date. Here is my solution:
+
+```{r xtrafeature}
+current_year <- year(Sys.Date())
+more_feature_data <- one_hot_data %>% 
+  mutate(Car_Age = current_year - Year)
+knitr::kable(head(more_feature_data), caption = "First few rows after adding the extra feature column for car age")
+```
+
+At the furthest right of the data, we can see that Car_Age has been added as a new feature(column) to the data.
+
+
+## Select/Filter/Rename/Mutate/Arrange/Summarize
+
+For the last step of this assignment, I will present my methods of utilizing select, filter, rename, mutate, arrange, and summarize to wrangle the data.
+
+```{r practice}
+select_practice <- more_feature_data %>% 
+  select(Name)
+knitr::kable(head(select_practice), caption = "Selected columns: Name")
+
+filter_practice <- more_feature_data %>% 
+  filter(`Transmission` == "Automatic")
+knitr::kable(head(filter_practice), caption = "Filtered rows where Transmission is Automatic")
+
+rename_practice <- more_feature_data %>% 
+  rename(`Transmission_Type` = `Transmission`)
+knitr::kable(head(rename_practice), caption = "Renamed column: Transmission to Transmission_Type")
+
+mutate_practice <- more_feature_data %>% 
+  mutate(Price_Drop = `New_Price(Lakh)` - `Price(Lakh)`)
+knitr::kable(head(mutate_practice), caption = "Added new column: Price_Drop (New_Price - Price)")
+
+arrange_practice <- more_feature_data %>% 
+  arrange(desc(Year))
+knitr::kable(head(arrange_practice), caption = "Arranged rows in descending order of Year")
+
+summarize_practice <- more_feature_data %>% 
+  group_by(Fuel_Type) %>% 
+  summarize(mean = mean(`Price(Lakh)`))
+knitr::kable(head(summarize_practice), caption = "Summary: Mean Price(Lakh) by Fuel Type")
+```
